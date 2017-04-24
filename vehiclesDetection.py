@@ -15,6 +15,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cross_validation import train_test_split
 from sklearn.svm import LinearSVC
 from scipy.ndimage.measurements import label
+from advancedLaneLines_funcs import *
 
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part A: Help Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
@@ -336,24 +337,48 @@ def apply_threshold(heatmap, threshold):
 ###   Output: 
 ###      img: the final image with the estimated cars positions
 def draw_labeled_bboxes(img, labels):
-	# Iterate through all detected cars
-	for car_number in range(1, labels[1]+1):
-		# Find pixels with each car_number label value
-		nonzero = (labels[0] == car_number).nonzero()
-		# Identify x and y values of those pixels
-		nonzeroy = np.array(nonzero[0])
+	for car_number in range(1, labels[1]+1):               # Iterate through all detected cars
+		nonzero = (labels[0] == car_number).nonzero()      # Find pixels with each car_number label value
+		nonzeroy = np.array(nonzero[0])                    # Identify x and y values of those pixels
 		nonzerox = np.array(nonzero[1])
-		# Define a bounding box based on min/max x and y
-		bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
-		# Draw the box on the image
-		cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
-	# Return the image
-	return img
+		bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy))) # Define a bounding box based on min/max x and y
+		cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6) # Draw the box on the image
+	return img # Return the image
+
+
+### set_search_windows: Define a function that draws the estimated cars position
+###   Input: 
+###       is_draw: If we want to draw all the windows 
+###
+###   Output: 
+###      windows: all the windows
+def set_search_windows(is_draw=False):
+	img_fname_tmp = 'test_images/test1.jpg'   # image name
+	image_tmp = cv2.imread(img_fname_tmp)          # read the image
+	image_tmp = cv2.cvtColor(image_tmp,cv2.COLOR_BGR2RGB) # convert to rgb
+	shape = image_tmp.shape
+	windows = slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 656], xy_window=(128, 128), xy_overlap=(0.75, 0.75))
+	if is_draw:
+		window_img = draw_boxes(image_tmp, windows, color=(0, 0, 255), thick=6) # draw all the boxes we found
+	windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 592], xy_window=(96, 96), xy_overlap=(0.75, 0.75))
+	if is_draw:
+		window_img = draw_boxes(image_tmp, windows, color=(0, 255, 0), thick=6) # draw all the boxes we found
+	windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 528], xy_window=(64, 64), xy_overlap=(0.75, 0.75))
+	if is_draw:
+		window_img = draw_boxes(image_tmp, windows, color=(255, 0, 0), thick=6) # draw all the boxes we found
+	windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 496], xy_window=(48, 48), xy_overlap=(0.75, 0.75))
+	if is_draw:
+		window_img = draw_boxes(image_tmp, windows, color=(255, 0, 255), thick=6) # draw all the boxes we found
+	
+	#cv2.imwrite("output_images/img_tmp1.jpg", cv2.cvtColor(window_img, cv2.COLOR_RGB2BGR))
+	return windows
+	
 	
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part B: Train the SVC model and Set the feature parametres ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
 load_svc = True
-pickle_file = 'svc_data.p'  
+pickle_file_svc = 'svc_data.p'  
+pickle_file_preprocess = 'preprocess_data.p'
 if (load_svc==False):
 	debug_len = -1
 		
@@ -392,11 +417,9 @@ if (load_svc==False):
 
 		
 
-	X = np.vstack((car_features, notcar_features)).astype(np.float64)                        
-	# Fit a per-column scaler
-	X_scaler = StandardScaler().fit(X)
-	# Apply the scaler to X
-	scaled_X = X_scaler.transform(X)
+	X = np.vstack((car_features, notcar_features)).astype(np.float64)                        	
+	X_scaler = StandardScaler().fit(X) # Fit a per-column scaler	
+	scaled_X = X_scaler.transform(X) # Apply the scaler to X
 
 	# Define the labels vector
 	y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
@@ -421,38 +444,23 @@ if (load_svc==False):
 	print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4)) # Check the score of the SVC
 
 	# Save the data for easy access
-	with open(pickle_file, 'wb') as pfile:
+	with open(pickle_file_svc, 'wb') as pfile:
 		pickle.dump({'color_space': color_space, 'orient': orient, 'pix_per_cell': pix_per_cell, 'cell_per_block': cell_per_block, 'hog_channel': hog_channel,
 					 'spatial_size': spatial_size, 'hist_bins': hist_bins, 'spatial_feat': spatial_feat, 'hist_feat': hist_feat, 'hog_feat': hog_feat, 'X_scaler': X_scaler, 'svc': svc}, pfile)
 
 
-'''
-fig = plt.figure()
-plt.subplot(121)
-plt.imshow(draw_img)
-plt.title('Car Positions')
-plt.subplot(122)
-plt.imshow(heatmap, cmap='hot')
-plt.title('Heat Map')
-fig.tight_layout()
-'''
+
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part C: Parameters and SVC for the Pipeline ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
 ###     1) Set the windows we will search on
 ###     2) Load the data we used also in the SVC training
+###     3) Load the data we used for the preprocessing image
 
 ### 1) Get windows: We used a temp image just to get the image shape
-img_fname_tmp = 'test_images/test1.jpg'   # image name
-image_tmp = cv2.imread(img_fname_tmp)           # read the image
-shape = image_tmp.shape
-windows = slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 656], xy_window=(128, 128), xy_overlap=(0.75, 0.75))
-windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 592], xy_window=(96, 96), xy_overlap=(0.75, 0.75))
-windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 528], xy_window=(64, 64), xy_overlap=(0.75, 0.75))
-windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 496], xy_window=(48, 48), xy_overlap=(0.75, 0.75))
+windows = set_search_windows(is_draw=True)
 
-###
-### Load the data we used also in the SVC training
-with open(pickle_file, mode='rb') as pfile:
+### 2) Load the data we used also in the SVC training
+with open(pickle_file_svc, mode='rb') as pfile:
 	pfile_data = pickle.load(pfile)
 
 color_space = pfile_data['color_space']
@@ -468,6 +476,15 @@ hog_feat = pfile_data['hog_feat']
 X_scaler = pfile_data['X_scaler']
 svc = pfile_data['svc']
 
+### 3) Load the data we used for the preprocessing image
+with open(pickle_file_preprocess, mode='rb') as pfile:
+	pfile_data = pickle.load(pfile)
+
+mtx = pfile_data['mtx']
+dist = pfile_data['dist']
+M = pfile_data['M']
+M_inv = pfile_data['M_inv']
+
 
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part D: Main Pipeline ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
@@ -480,17 +497,71 @@ svc = pfile_data['svc']
 ###   Output: 
 ###       result: the image with the lane lines estimation
 def process_image(img, single_img=False, fname=''):
-	# define static vars
+	also_lanes=False # also plot the lane lines
+	
+	##
+	## define function vars - both for the vehicles and lane line detection
+	n_frames_history = 10  # history length
+	heat_map_th = 3        # heat map threshold for a single frame
+	
+	a_good = 0.75 # the IIR filter coeff. The weight of the current estimation when detected=True
+	a_bad = 0.25  # the IIR filter coeff. The weight of the current estimation when detected=False
+	bad_frames_th = 3 # number of consecutive bad frames before we startover in the polyfit estimation
+	
+	##
+	## define static vars - both for the vehicles and lane line detection
 	if not hasattr(process_image, "first_frame"):
 		process_image.first_frame = True  # it doesn't exist yet, so initialize it
 	if not hasattr(process_image, "cnt"):
 		process_image.cnt = 0  # it doesn't exist yet, so initialize it
-
+	if not hasattr(process_image, "heat_over_time"):
+		process_image.heat_over_time = np.zeros_like(img[:,:,0]).astype(np.float) # it doesn't exist yet, so initialize it
+		process_image.heat_over_time = np.expand_dims(process_image.heat_over_time, axis=2)
+		process_image.heat_over_time = np.repeat(process_image.heat_over_time, n_frames_history, axis=2) # it doesn't exist yet, so initialize it
 	
-	draw_image = np.copy(img)           # the output image initialization
+	if not hasattr(process_image, "n_bad_frames"):
+		process_image.n_bad_frames = 1000  # it doesn't exist yet, so initialize it
+	if not hasattr(process_image, "left_fit"):
+		process_image.left_fit = None  # it doesn't exist yet, so initialize it
+	if not hasattr(process_image, "right_fit"):
+		process_image.right_fit = None  # it doesn't exist yet, so initialize it
+	
+	##
+	## Finding lane lines	
+	if (also_lanes==True):
+		rgb_undist_img = calibrate_road_image(img, mtx, dist, fname=fname, plot_en=single_img)                       # apply the Calibration parameters on one of the test images
+		b_undist_img = apply_binary_th(rgb_undist_img, plot_en=single_img)                                           # b_ stands for binary  
+		bird_b_undist_img = cv2.warpPerspective(b_undist_img, M, (rgb_undist_img.shape[1], rgb_undist_img.shape[0])) # apply the matrix
+		left_fit_curr, right_fit_curr, detected, detected_case = fit_lane_line(bird_b_undist_img, startover=(process_image.n_bad_frames>bad_frames_th), left_fit_prev=process_image.left_fit, right_fit_prev=process_image.right_fit, plot_en=single_img)   # find the lane line fit
+
+		if process_image.first_frame: # first time ever
+			process_image.left_fit = left_fit_curr
+			process_image.right_fit = right_fit_curr
+			process_image.first_frame = single_img
+			if detected:
+				process_image.n_bad_frames = 1000
+		else:
+			if detected:     # the current estimation looks good, we weight it with the previous estimation (IIR)
+				a = a_good
+				process_image.n_bad_frames = 0
+			else:
+				a = a_bad
+				process_image.n_bad_frames += 1
+			
+			process_image.left_fit = (1.0-a)*process_image.left_fit + a*left_fit_curr
+			process_image.right_fit = (1.0-a)*process_image.right_fit + a*right_fit_curr
+		
+		result = draw_lane_lines(rgb_undist_img, process_image.left_fit, process_image.right_fit, M_inv=M_inv, plot_en=single_img)    # draw the estimated lane lines, the curvature and the offset
+		
+	else: 
+		result = np.copy(img)
+	
+	##
+	## Finding vehicles
+	draw_image = np.copy(result)           # the output image initialization
 	img = img.astype(np.float32)/255.0  # transform the image to [0,1) float values
 
-	# Search all windows and return the widows that found a car
+	## Search all windows and return the widows that found a car
 	hot_windows = search_windows(img, windows, svc, X_scaler, color_space=color_space, 
 							spatial_size=spatial_size, hist_bins=hist_bins, 
 							orient=orient, pix_per_cell=pix_per_cell, 
@@ -499,20 +570,24 @@ def process_image(img, single_img=False, fname=''):
 							hist_feat=hist_feat, hog_feat=hog_feat)
 
 
-	
-	window_img = draw_boxes(draw_image, hot_windows, color=(0, 0, 255), thick=6) # draw all the boxes we found
-	#cv2.imwrite("output_images/img_tmp1.jpg", cv2.cvtColor(window_img, cv2.COLOR_RGB2BGR))
-
+	## Heat map on the current frame
 	heat = np.zeros_like(img[:,:,0]).astype(np.float)
 	heat = add_heat(heat,hot_windows)    # Add heat to each box in box list
-	heat = apply_threshold(heat,3)       # Apply threshold to help remove false positives
+	heat = apply_threshold(heat,heat_map_th)       # Apply threshold to help remove false positives
 	heatmap = np.clip(heat, 0, 255)      # Visualize the heatmap when displaying
-	labels = label(heatmap)              # Find final boxes from heatmap using label function
-	draw_img = draw_labeled_bboxes(np.copy(draw_image), labels)	
 
+	## Heat map on the last 'n_frames_history' frames
+	process_image.heat_over_time[:,:,1:] = process_image.heat_over_time[:,:,0:-1]
+	process_image.heat_over_time[:,:,0] = heat
+	heat_lpf = np.sum(process_image.heat_over_time[:,:,:], axis=2)
+	heat_lpf = apply_threshold(heat_lpf,heat_map_th*np.clip(process_image.cnt+1, 0, n_frames_history))  # Apply threshold (n_frames_history * single_frame_th) to help remove false positives
+	heatmap_lpf = np.clip(heat_lpf, 0, 255)                                                             # Visualize the heatmap when displaying
+	
+	labels = label(heatmap_lpf)                                     # Find final boxes from heatmap using label function
+	draw_img = draw_labeled_bboxes(np.copy(draw_image), labels)	    # Draw the vehicles location
 
 	if single_img:
-		cv2.imwrite("output_images/img_tmp1.jpg", cv2.cvtColor(draw_img, cv2.COLOR_RGB2BGR))
+		cv2.imwrite("output_images/" +fname[12:17]+ "_with_cars_est.jpg" , cv2.cvtColor(draw_img, cv2.COLOR_RGB2BGR))
 	else:
 		process_image.cnt+=1
 		if ((process_image.cnt%100)==0):
@@ -541,9 +616,20 @@ plt.savefig('output_images/original_vs_calibratted_{}.png'.format(fig_name))
 
 '''
 
+'''
+fig = plt.figure()
+plt.subplot(121)
+plt.imshow(draw_img)
+plt.title('Car Positions')
+plt.subplot(122)
+plt.imshow(heatmap, cmap='hot')
+plt.title('Heat Map')
+fig.tight_layout()
+'''
+
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part E: Using the Pipeline on a single image or on a video ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
-single_img_en = False  # enable single image
-video_en = True        # enable the video
+single_img_en = True  # enable single image
+video_en = False        # enable the video
 
 ###
 ### Single image
