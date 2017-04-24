@@ -108,17 +108,18 @@ def color_hist(img, nbins=32, bins_range=(0, 1)):
 ###
 ###   Output: 
 ###      features: return all features
+###      channel_image: hog image example list
+###      hog_image: hog image example list
 def extract_features(imgs, color_space='RGB', spatial_size=(32, 32),
                         hist_bins=32, orient=9, 
                         pix_per_cell=8, cell_per_block=2, hog_channel=0,
-                        spatial_feat=True, hist_feat=True, hog_feat=True):
-	# Create a list to append feature vectors to
-	features = []
-	# Iterate through the list of images
-	for file in imgs:
+                        spatial_feat=True, hist_feat=True, hog_feat=True, plot_example=False):
+	channel_image = [] # set to empty array if we will not use it
+	hog_image = []	   # set to empty array if we will not use it
+	features = []      # Create a list to append feature vectors to
+	for file in imgs:  # Iterate through the list of images
 		file_features = []
-		# Read in each one by one
-		image = mpimg.imread(file)
+		image = mpimg.imread(file) # Read in each one by one
 		# apply color conversion if other than 'RGB'
 		if color_space != 'RGB':
 			if color_space == 'HSV':
@@ -149,14 +150,19 @@ def extract_features(imgs, color_space='RGB', spatial_size=(32, 32),
 										orient, pix_per_cell, cell_per_block, 
 										vis=False, feature_vec=True))
 				hog_features = np.ravel(hog_features)        
-			else:
-				hog_features = get_hog_features(feature_image[:,:,hog_channel], orient, 
-							pix_per_cell, cell_per_block, vis=False, feature_vec=True)
+			else:	
+				if (plot_example):
+					hog_features, hog_image = get_hog_features(feature_image[:,:,hog_channel], orient, pix_per_cell, cell_per_block, vis=True, feature_vec=True)
+					channel_image = feature_image[:,:,hog_channel]
+				else:
+					hog_features = get_hog_features(feature_image[:,:,hog_channel], orient, pix_per_cell, cell_per_block, vis=False, feature_vec=True)
+				
 			# Append the new feature vector to the features list
 			file_features.append(hog_features)
 		features.append(np.concatenate(file_features))
-	# Return list of feature vectors
-	return features
+		if (plot_example):
+			break
+	return features, channel_image, hog_image # Return list of feature vectors
     
 
 ### slide_window: Define the sliding window function
@@ -359,20 +365,94 @@ def set_search_windows(is_draw=False):
 	shape = image_tmp.shape
 	windows = slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 656], xy_window=(128, 128), xy_overlap=(0.75, 0.75))
 	if is_draw:
-		window_img = draw_boxes(image_tmp, windows, color=(0, 0, 255), thick=6) # draw all the boxes we found
-	windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 592], xy_window=(96, 96), xy_overlap=(0.75, 0.75))
-	if is_draw:
-		window_img = draw_boxes(image_tmp, windows, color=(0, 255, 0), thick=6) # draw all the boxes we found
-	windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 528], xy_window=(64, 64), xy_overlap=(0.75, 0.75))
-	if is_draw:
-		window_img = draw_boxes(image_tmp, windows, color=(255, 0, 0), thick=6) # draw all the boxes we found
-	windows += slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 496], xy_window=(48, 48), xy_overlap=(0.75, 0.75))
-	if is_draw:
-		window_img = draw_boxes(image_tmp, windows, color=(255, 0, 255), thick=6) # draw all the boxes we found
+		window_img = draw_boxes(image_tmp, windows, color=(0, 0, 255), thick=5) # draw all the boxes we found
 	
-	#cv2.imwrite("output_images/img_tmp1.jpg", cv2.cvtColor(window_img, cv2.COLOR_RGB2BGR))
+	windows_tmp = slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 592], xy_window=(96, 96), xy_overlap=(0.75, 0.75))
+	windows += windows_tmp
+	if is_draw:
+		window_img = draw_boxes(window_img, windows_tmp, color=(0, 255, 0), thick=4) # draw all the boxes we found
+	
+	windows_tmp = slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 528], xy_window=(64, 64), xy_overlap=(0.75, 0.75))
+	windows += windows_tmp
+	if is_draw:
+		window_img = draw_boxes(window_img, windows_tmp, color=(255, 0, 0), thick=3) # draw all the boxes we found
+	
+	windows_tmp = slide_window(shape, x_start_stop=[None, None], y_start_stop=[400, 496], xy_window=(48, 48), xy_overlap=(0.75, 0.75))
+	windows += windows_tmp
+	if is_draw:
+		window_img = draw_boxes(window_img, windows_tmp, color=(255, 0, 255), thick=2) # draw all the boxes we found
+	
+	if is_draw:
+		plt.figure(figsize=(16,8))
+		plt.imshow(window_img)
+		plt.title('All Sliding Windows we use')
+		plt.savefig("output_images/all_windows.png")
+	
 	return windows
 	
+	
+### plot_hog_example: Define a function that draws HOG image
+###   Input: 
+###       is_car: is it a car image 
+###       img_name: car/noncar image file name 
+###       feature_img: the channel we used to get the HOG image 
+###       hog_img: hog image of the car 
+###       idx: number to make sure we name the figures differently  
+###
+###   Output: 
+###   
+def plot_hog_example(is_car, img_name, channel_img, hog_img, idx):	
+	img = mpimg.imread(img_name)
+	plt.figure(figsize=(16,8))
+	plt.subplot(1,3,1)
+	plt.imshow(img)
+	plt.title('Original Image (idx={})'.format(idx))
+
+	plt.subplot(1,3,2)
+	plt.imshow(channel_img, cmap='gray')
+	plt.title('Y channel (idx={})'.format(idx))
+	
+	plt.subplot(1,3,3)
+	plt.imshow(hog_img, cmap='gray')
+	plt.title('Hog Image (idx={})'.format(idx))
+	
+	if (is_car):
+		plt.savefig("output_images/car_and_Hog_"+ str(idx) +".png")
+	else:
+		plt.savefig("output_images/noncar_and_Hog_"+ str(idx) +".png")
+
+		
+### plot_single_frame: Define a function that draws the estimated cars position for a single frame 
+###   Input: 
+###       fname: image name
+###       img: original image
+###       hot_windows: raw SVC estimation 
+###       heatmap: after we use the threshold to remove false alarms 
+###       draw_img: final estimation of the cars 
+###
+###   Output: 
+###   
+def plot_single_frame(fname, img, hot_windows, heatmap, draw_img):	
+	plt.figure(figsize=(16,8))
+	plt.subplot(2,2,1)
+	plt.imshow(img)
+	plt.title('Original Image - {}'.format(fname))
+
+	plt.subplot(2,2,2)
+	draw_image = np.copy(img)
+	window_img = draw_boxes(draw_image, hot_windows, color=(0, 0, 255), thick=6)
+	plt.imshow(window_img)
+	plt.title('raw SVC estimation')
+	
+	plt.subplot(2,2,3)
+	plt.imshow(heatmap, cmap='hot')
+	plt.title('Heat map')
+	
+	plt.subplot(2,2,4)
+	plt.imshow(draw_img)
+	plt.title('Final Estimation')
+	
+	plt.savefig("output_images/"+ fname +"_car_est.png")	
 	
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part B: Train the SVC model and Set the feature parametres ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
@@ -380,7 +460,7 @@ load_svc = True
 pickle_file_svc = 'svc_data.p'  
 pickle_file_preprocess = 'preprocess_data.p'
 if (load_svc==False):
-	debug_len = -1
+	debug_len = -1 
 		
 	color_space = 'YCrCb' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 	orient = 9  # HOG orientations
@@ -396,9 +476,9 @@ if (load_svc==False):
 
 	imgs_cars = glob.glob('vehicles/*/*.png')
 	if debug_len>0:
-		imgs_cars = imgs_cars[0:debug_len]
+		imgs_cars = imgs_cars[0:debug_len]	
 	
-	car_features = extract_features(imgs_cars, color_space=color_space, 
+	car_features, _, _ = extract_features(imgs_cars, color_space=color_space, 
 							spatial_size=spatial_size, hist_bins=hist_bins, 
 							orient=orient, pix_per_cell=pix_per_cell, 
 							cell_per_block=cell_per_block, 
@@ -408,7 +488,7 @@ if (load_svc==False):
 	imgs_non_cars = glob.glob('non-vehicles/*/*.png')
 	if debug_len>0:
 		imgs_non_cars = imgs_non_cars[0:debug_len]
-	notcar_features = extract_features(imgs_non_cars, color_space=color_space, 
+	notcar_features, _, _ = extract_features(imgs_non_cars, color_space=color_space, 
 							spatial_size=spatial_size, hist_bins=hist_bins, 
 							orient=orient, pix_per_cell=pix_per_cell, 
 							cell_per_block=cell_per_block, 
@@ -416,14 +496,12 @@ if (load_svc==False):
 							hist_feat=hist_feat, hog_feat=hog_feat)
 
 		
-
 	X = np.vstack((car_features, notcar_features)).astype(np.float64)                        	
 	X_scaler = StandardScaler().fit(X) # Fit a per-column scaler	
 	scaled_X = X_scaler.transform(X) # Apply the scaler to X
 
 	# Define the labels vector
 	y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
-
 	# Split up data into randomized training and test sets
 	rand_state = np.random.randint(0, 100)
 	X_train, X_test, y_train, y_test = train_test_split(scaled_X, y, test_size=0.2, random_state=rand_state)
@@ -442,13 +520,31 @@ if (load_svc==False):
 	t2 = time.time()
 	print(round(t2-t, 2), 'Seconds to train SVC...')
 	print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4)) # Check the score of the SVC
-
 	# Save the data for easy access
 	with open(pickle_file_svc, 'wb') as pfile:
 		pickle.dump({'color_space': color_space, 'orient': orient, 'pix_per_cell': pix_per_cell, 'cell_per_block': cell_per_block, 'hog_channel': hog_channel,
 					 'spatial_size': spatial_size, 'hist_bins': hist_bins, 'spatial_feat': spatial_feat, 'hist_feat': hist_feat, 'hog_feat': hog_feat, 'X_scaler': X_scaler, 'svc': svc}, pfile)
 
-
+	####
+	### Example for HOG with cars and noncars
+	for j in range(3):	
+		idx = np.random.randint(0, (len(imgs_cars)-2))
+		features_ex, img_ex, hog_img_ex = extract_features(imgs_cars[idx:idx+1], color_space=color_space, 
+							spatial_size=spatial_size, hist_bins=hist_bins, 
+							orient=orient, pix_per_cell=pix_per_cell, 
+							cell_per_block=cell_per_block, 
+							hog_channel=hog_channel, spatial_feat=spatial_feat, 
+							hist_feat=hist_feat, hog_feat=hog_feat, plot_example=True)
+		plot_hog_example(True, imgs_cars[idx], img_ex, hog_img_ex, j)
+		
+		idx = np.random.randint(0, (len(imgs_non_cars)-2))
+		features_ex, img_ex, hog_img_ex = extract_features(imgs_non_cars[idx:idx+1], color_space=color_space, 
+							spatial_size=spatial_size, hist_bins=hist_bins, 
+							orient=orient, pix_per_cell=pix_per_cell, 
+							cell_per_block=cell_per_block, 
+							hog_channel=hog_channel, spatial_feat=spatial_feat, 
+							hist_feat=hist_feat, hog_feat=hog_feat, plot_example=True)
+		plot_hog_example(False, imgs_non_cars[idx], img_ex, hog_img_ex, j)
 
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part C: Parameters and SVC for the Pipeline ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
@@ -558,7 +654,7 @@ def process_image(img, single_img=False, fname=''):
 	
 	##
 	## Finding vehicles
-	draw_image = np.copy(result)           # the output image initialization
+	draw_image = np.copy(result)        # the output image initialization
 	img = img.astype(np.float32)/255.0  # transform the image to [0,1) float values
 
 	## Search all windows and return the widows that found a car
@@ -572,9 +668,9 @@ def process_image(img, single_img=False, fname=''):
 
 	## Heat map on the current frame
 	heat = np.zeros_like(img[:,:,0]).astype(np.float)
-	heat = add_heat(heat,hot_windows)    # Add heat to each box in box list
-	heat = apply_threshold(heat,heat_map_th)       # Apply threshold to help remove false positives
-	heatmap = np.clip(heat, 0, 255)      # Visualize the heatmap when displaying
+	heat = add_heat(heat,hot_windows)         # Add heat to each box in box list
+	heat = apply_threshold(heat,heat_map_th)  # Apply threshold to help remove false positives
+	heatmap = np.clip(heat, 0, 255)           # Visualize the heatmap when displaying
 
 	## Heat map on the last 'n_frames_history' frames
 	process_image.heat_over_time[:,:,1:] = process_image.heat_over_time[:,:,0:-1]
@@ -586,8 +682,11 @@ def process_image(img, single_img=False, fname=''):
 	labels = label(heatmap_lpf)                                     # Find final boxes from heatmap using label function
 	draw_img = draw_labeled_bboxes(np.copy(draw_image), labels)	    # Draw the vehicles location
 
+	if (True and single_img==False): # for debug
+		cv2.imwrite("video_images/img" + str(process_image.cnt) + ".jpg", cv2.cvtColor(draw_img, cv2.COLOR_RGB2BGR))	
+		
 	if single_img:
-		cv2.imwrite("output_images/" +fname[12:17]+ "_with_cars_est.jpg" , cv2.cvtColor(draw_img, cv2.COLOR_RGB2BGR))
+		plot_single_frame(fname[12:17], draw_image, hot_windows, heatmap, draw_img)
 	else:
 		process_image.cnt+=1
 		if ((process_image.cnt%100)==0):
@@ -596,40 +695,9 @@ def process_image(img, single_img=False, fname=''):
 	return draw_img
 	
 	
-'''
-plt.figure(figsize=(16,8))
-plt.subplot(1,2,1)
-plt.imshow(img_dist)
-plt.title('Original: {}'.format(title))
-if corners is not None:
-	plt.xlim([X_min,X_max])
-	plt.ylim([Y_max,Y_min])
-plt.subplot(1,2,2)
-plt.imshow(img_undist)
-plt.title('Undistorted Image')
-if corners is not None:
-	plt.xlim([X_min,X_max])
-	plt.ylim([Y_max,Y_min])
-	
-
-plt.savefig('output_images/original_vs_calibratted_{}.png'.format(fig_name))
-
-'''
-
-'''
-fig = plt.figure()
-plt.subplot(121)
-plt.imshow(draw_img)
-plt.title('Car Positions')
-plt.subplot(122)
-plt.imshow(heatmap, cmap='hot')
-plt.title('Heat Map')
-fig.tight_layout()
-'''
-
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part E: Using the Pipeline on a single image or on a video ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
-single_img_en = True  # enable single image
-video_en = False        # enable the video
+single_img_en = False  # enable single image
+video_en = True        # enable the video
 
 ###
 ### Single image
