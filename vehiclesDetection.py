@@ -1,6 +1,7 @@
 import cv2
 import glob
 import time
+import math
 import pickle
 import numpy as np
 import random
@@ -389,8 +390,30 @@ def set_search_windows(is_draw=False):
 		plt.savefig("output_images/all_windows.png")
 	
 	return windows
+
 	
+### plot_car_noncar_example: Define a function that draws an example for a car and noncar images
+###   Input: 
+###       car_img_name: car/noncar image file name 
+###       non_car_img_name: car/noncar image file name 
+###
+###   Output: 
+###   
+def plot_car_noncar_example(car_img_name, non_car_img_name):	
+	img_car = mpimg.imread(car_img_name)
+	img_noncar = mpimg.imread(non_car_img_name)
+	plt.figure(figsize=(16,8))
+	plt.subplot(1,2,1)
+	plt.imshow(img_car)
+	plt.title('Car')
+
+	plt.subplot(1,2,2)
+	plt.imshow(img_noncar)
+	plt.title('Non-Car')
 	
+	plt.savefig("output_images/car_and_noncar_example.png")
+
+		
 ### plot_hog_example: Define a function that draws HOG image
 ###   Input: 
 ###       is_car: is it a car image 
@@ -406,7 +429,10 @@ def plot_hog_example(is_car, img_name, channel_img, hog_img, idx):
 	plt.figure(figsize=(16,8))
 	plt.subplot(1,3,1)
 	plt.imshow(img)
-	plt.title('Original Image (idx={})'.format(idx))
+	if (is_car):
+		plt.title('Original Car Image (idx={})'.format(idx))
+	else:
+		plt.title('Original NonCar Image (idx={})'.format(idx))
 
 	plt.subplot(1,3,2)
 	plt.imshow(channel_img, cmap='gray')
@@ -453,25 +479,63 @@ def plot_single_frame(fname, img, hot_windows, heatmap, draw_img):
 	plt.title('Final Estimation')
 	
 	plt.savefig("output_images/"+ fname +"_car_est.png")	
+
+	
+### plot_frames_over_time: Define a function that draws the estimated cars position for a single frame 
+###   Input: 
+###       imgs: images on consecutive frames 
+###       heat_over_time: heat map over time - each frame on its on
+###       final_label: final label estimation 
+###       final_draw: final car position estimation 
+###
+###   Output: 
+###   
+def plot_frames_over_time(imgs, heat_over_time, final_label, final_draw, frame_trig):	
+	n_frames=len(imgs)
+	frames_per_fig = 5
+	
+	for j in range(np.int(math.ceil(n_frames/frames_per_fig))):
+		plt.figure(figsize=(16,8))
+		for i in range(frames_per_fig):
+			k = j*frames_per_fig+i
+			plt.subplot(2,frames_per_fig,1+i)
+			plt.imshow(imgs[k])
+			plt.title('Frame, k={}'.format(frame_trig+k))
+			
+			plt.subplot(2,frames_per_fig,1+i+frames_per_fig)
+			heatmap = np.clip(heat_over_time[:,:,-1-k], 0, 255)
+			plt.imshow(heatmap, cmap='hot')
+			plt.title('Heat map per frame, k={}'.format(frame_trig+k))
+		plt.savefig("output_images/video_frames_"+str(frame_trig+j*frames_per_fig)+"_"+str(frame_trig+(j+1)*frames_per_fig-1)+".png")
+	
+	plt.figure(figsize=(16,8))
+	plt.subplot(1,2,1)
+	plt.imshow(final_label[0], cmap='gray')
+	plt.title('Final Label est, frames {} to {}'.format(frame_trig,frame_trig+n_frames-1))
+	plt.subplot(1,2,2)
+	plt.imshow(final_draw)
+	plt.title('Final est, frames {} to {}'.format(frame_trig,frame_trig+n_frames-1))
+	
+	plt.savefig("output_images/video_snapshot_"+str(frame_trig)+"_"+str(frame_trig+n_frames-1)+".png")
 	
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part B: Train the SVC model and Set the feature parametres ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
-load_svc = True
+load_svc = False
 pickle_file_svc = 'svc_data.p'  
 pickle_file_preprocess = 'preprocess_data.p'
 if (load_svc==False):
 	debug_len = -1 
 		
-	color_space = 'YCrCb' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-	orient = 9  # HOG orientations
-	pix_per_cell = 8 # HOG pixels per cell
-	cell_per_block = 2 # HOG cells per block
-	hog_channel = 0 # Can be 0, 1, 2, or "ALL"
+	color_space = 'YCrCb'   # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+	orient = 9              # HOG orientations
+	pix_per_cell = 8        # HOG pixels per cell
+	cell_per_block = 2      # HOG cells per block
+	hog_channel = 0         # Can be 0, 1, 2, or "ALL"
 	spatial_size = (16, 16) # Spatial binning dimensions
-	hist_bins = 16    # Number of histogram bins
-	spatial_feat = True # Spatial features on or off
-	hist_feat = True # Histogram features on or off
-	hog_feat = True # HOG features on or off
+	hist_bins = 16          # Number of histogram bins
+	spatial_feat = True     # Spatial features on or off
+	hist_feat = True        # Histogram features on or off
+	hog_feat = True         # HOG features on or off
 
 
 	imgs_cars = glob.glob('vehicles/*/*.png')
@@ -526,25 +590,28 @@ if (load_svc==False):
 					 'spatial_size': spatial_size, 'hist_bins': hist_bins, 'spatial_feat': spatial_feat, 'hist_feat': hist_feat, 'hog_feat': hog_feat, 'X_scaler': X_scaler, 'svc': svc}, pfile)
 
 	####
-	### Example for HOG with cars and noncars
+	### Plot some examples. Car and non-car and HOG with cars and noncars
+	idxc = np.random.randint(0, (len(imgs_cars)-1))
+	idxn = np.random.randint(0, (len(imgs_non_cars)-1))
+	plot_car_noncar_example(imgs_cars[idxc], imgs_non_cars[idxn])
 	for j in range(3):	
-		idx = np.random.randint(0, (len(imgs_cars)-2))
-		features_ex, img_ex, hog_img_ex = extract_features(imgs_cars[idx:idx+1], color_space=color_space, 
+		idxc = np.random.randint(0, (len(imgs_cars)-2))
+		features_ex, img_ex, hog_img_ex = extract_features(imgs_cars[idxc:idxc+1], color_space=color_space, 
 							spatial_size=spatial_size, hist_bins=hist_bins, 
 							orient=orient, pix_per_cell=pix_per_cell, 
 							cell_per_block=cell_per_block, 
 							hog_channel=hog_channel, spatial_feat=spatial_feat, 
 							hist_feat=hist_feat, hog_feat=hog_feat, plot_example=True)
-		plot_hog_example(True, imgs_cars[idx], img_ex, hog_img_ex, j)
+		plot_hog_example(True, imgs_cars[idxc], img_ex, hog_img_ex, j)
 		
-		idx = np.random.randint(0, (len(imgs_non_cars)-2))
-		features_ex, img_ex, hog_img_ex = extract_features(imgs_non_cars[idx:idx+1], color_space=color_space, 
+		idxn = np.random.randint(0, (len(imgs_non_cars)-2))
+		features_ex, img_ex, hog_img_ex = extract_features(imgs_non_cars[idxn:idxn+1], color_space=color_space, 
 							spatial_size=spatial_size, hist_bins=hist_bins, 
 							orient=orient, pix_per_cell=pix_per_cell, 
 							cell_per_block=cell_per_block, 
 							hog_channel=hog_channel, spatial_feat=spatial_feat, 
 							hist_feat=hist_feat, hog_feat=hog_feat, plot_example=True)
-		plot_hog_example(False, imgs_non_cars[idx], img_ex, hog_img_ex, j)
+		plot_hog_example(False, imgs_non_cars[idxn], img_ex, hog_img_ex, j)
 
 
 ####  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Part C: Parameters and SVC for the Pipeline ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  ####
@@ -593,12 +660,13 @@ M_inv = pfile_data['M_inv']
 ###   Output: 
 ###       result: the image with the lane lines estimation
 def process_image(img, single_img=False, fname=''):
-	also_lanes=False # also plot the lane lines
+	also_lanes = True      # also plot the lane lines
 	
 	##
 	## define function vars - both for the vehicles and lane line detection
-	n_frames_history = 10  # history length
-	heat_map_th = 3        # heat map threshold for a single frame
+	n_frames_history = 15  # history length
+	heat_map_th = 5        # heat map threshold for a single frame
+	snapshot_trig = 940    # snapshot, for plotting in the writeup 940
 	
 	a_good = 0.75 # the IIR filter coeff. The weight of the current estimation when detected=True
 	a_bad = 0.25  # the IIR filter coeff. The weight of the current estimation when detected=False
@@ -610,6 +678,8 @@ def process_image(img, single_img=False, fname=''):
 		process_image.first_frame = True  # it doesn't exist yet, so initialize it
 	if not hasattr(process_image, "cnt"):
 		process_image.cnt = 0  # it doesn't exist yet, so initialize it
+	if not hasattr(process_image, "img_frames_snapshot"):
+		process_image.img_frames_snapshot = []  # it doesn't exist yet, so initialize it
 	if not hasattr(process_image, "heat_over_time"):
 		process_image.heat_over_time = np.zeros_like(img[:,:,0]).astype(np.float) # it doesn't exist yet, so initialize it
 		process_image.heat_over_time = np.expand_dims(process_image.heat_over_time, axis=2)
@@ -621,6 +691,10 @@ def process_image(img, single_img=False, fname=''):
 		process_image.left_fit = None  # it doesn't exist yet, so initialize it
 	if not hasattr(process_image, "right_fit"):
 		process_image.right_fit = None  # it doesn't exist yet, so initialize it
+	
+	if (False and process_image.cnt<(snapshot_trig-2)): # for debug
+		process_image.cnt+=1
+		return img
 	
 	##
 	## Finding lane lines	
@@ -682,7 +756,13 @@ def process_image(img, single_img=False, fname=''):
 	labels = label(heatmap_lpf)                                     # Find final boxes from heatmap using label function
 	draw_img = draw_labeled_bboxes(np.copy(draw_image), labels)	    # Draw the vehicles location
 
-	if (True and single_img==False): # for debug
+	if ((process_image.cnt+1)>snapshot_trig and (process_image.cnt+1)<=(n_frames_history+snapshot_trig)):
+		process_image.img_frames_snapshot.append(draw_image)
+		if ((process_image.cnt+1)==(n_frames_history+snapshot_trig)):
+			plot_frames_over_time(process_image.img_frames_snapshot, process_image.heat_over_time, labels, draw_img, snapshot_trig+1)
+	
+	
+	if (False and single_img==False): # for debug
 		cv2.imwrite("video_images/img" + str(process_image.cnt) + ".jpg", cv2.cvtColor(draw_img, cv2.COLOR_RGB2BGR))	
 		
 	if single_img:
@@ -711,7 +791,8 @@ if single_img_en:
 ###
 ### Video: Read the video and add the estimated lane lines on it
 if video_en:
-	output = 'test_video_with_cars.mp4'
-	clip = VideoFileClip("test_video.mp4")
+	video_fname = 'project_video'   # image name  test_video or project_video
+	output = video_fname + '_with_cars.mp4'
+	clip = VideoFileClip(video_fname+'.mp4')
 	out_clip = clip.fl_image(process_image) 
 	out_clip.write_videofile(output, audio=False)
