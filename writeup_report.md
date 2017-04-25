@@ -32,7 +32,7 @@ The goals / steps of this project are the following:
 [image16]: ./output_images/video_frames_946_950.png
 [image17]: ./output_images/video_frames_951_955.png
 [image18]: ./output_images/video_snapshot_941_955.png
-[video19]: ./project_video_with_cars.mp4
+
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
 ###Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
@@ -166,8 +166,9 @@ As I talked before I tried different features configuration, different color map
 ### Video Implementation
 
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
-Here's a [link to my video result](https://github.com/shayko18/CarND-Vehicle-Detection/project_video_with_cars.mp4)
-![alt text][video19]
+Here's a [link to my video result](https://github.com/shayko18/CarND-Vehicle-Detection/blob/master/project_video_with_cars.mp4)
+
+I aslo added the lane lines from the last project.
 
 ####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
