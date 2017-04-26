@@ -49,9 +49,12 @@ You can find there:
 - project_video_with_cars.mp4: the video output of this project
 - writeup_report.md: the writeup of this project
 - output_images folder: images that we will use in this writeup
+- pickle files for the svc model and form last project also some data (calibration matrix and birdeye matrix):
+	- svc_data.p
+	- preprocess_data.p
 
 ###Overview of the main python file
-We divide the file to five parts:
+I divide the file to five parts:
 
 - Part A (Lines 22-520): This part hold all the help functions we will use. Most of them are the function from class and there are some new ones that are mainly used to plot the images we will use in this writeup.
 - Part B (Lines 522-615):This part is used to set the parameters we will use to extract the features and to train and test the SVC model. After we find the SVC model we save the relevant parameters to "svc_data.p". There is the option to skip training the model each time but to load the saved data (using: load_svc=True)
@@ -59,7 +62,7 @@ We divide the file to five parts:
 	- The windows that we will use in the sliding window (we also plot them)
 	- The SVC model and the parameters we will use to extract the features 
 	- Some data from the previous project (Advanced-Lane-Lines) we will use to also plot the lane lines here
-- Part D (Lines 653-776): The main pipeline. Only one function- process_image(). we will use it both for the video and for the single test images.
+- Part D (Lines 653-776): The main pipeline. Only one function- process_image(). we will use it both for the video and for the single test images. In this function we do some filtering over the frames if the input is the video option.
 - Part E (Lines 778-798): Here we decide if the run the pipeline on a single image (and which image) and/or on the video (and which video)
 
 ###Histogram of Oriented Gradients (HOG)
@@ -70,12 +73,14 @@ In lines 541-565 we extracted the features from the given images of the `vehicle
  
 ![alt text][image1]
 
-Next for each image we extracted the features we want. I used the spatial features, the histogram features and the most important is the HOG features. The function that was used for it was extract_features(...) (Line 95-166). This function was talked about in class. To get the HOG features it calls get_hog_features(...) (Line 39-64) which will simply call the hog function.
+Next for each image we extracted the features we want. I used the spatial features, the histogram features and the most important is the HOG features. The function that was used for it was extract_features(...) (Line 95-166). This function was talked about in class. To get the HOG features it calls get_hog_features(...) (Line 39-64) which will simply call the hog function. Later we will show the number of features of each kind.
 
 
 I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like. I also tested some configurations with the SVC to see what are the result I get. When I added also the spatial features and the histogram features the SVC estimator improved from about 95% to 98%. Of course it will require more computation but I decided to stay with it for now.
 
-Here is an example using the `YCrCb` color space and HOG parameters fron the Y-channel of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`. The first three examples are for car images and the last three are for non car images:
+Here is an example using the `YCrCb` color space and HOG parameters fron the Y-channel of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`. 
+
+The first three examples are for car images and the last three are for non car images:
 
 ![alt text][image2]
 ![alt text][image3]
@@ -103,7 +108,11 @@ Those are the final parameters I used (including the other features) (Lines 528-
 
 Total number of features:
 
-	Feature vector length: 2580
+	Feature vector length: 2580 = HOG + Spatial + histogram
+		HOG = (pix_per_cell-1)^2 * cell_per_block^2 * orient = 1764
+		Spatial = spatial_size[0] * spatial_size[1] * 3 channel = 768
+		histogram = hist_bins * 3 channel = 48
+
 
 
 ####3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
@@ -131,6 +140,7 @@ After extracting and scaling all the features we have we took few steps to train
 ####1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
 The windows are set in the function set_search_windows(...) (Lines 356-393)
+
 - Window sizes: As was talked about in class we wanted different window sizes because the different size of the car (in pixels) as it is near to us or far away from us - I took 4 sizes.
 - Global search area: The search area should be only "on the road level" (not in the sky) and this is why all windows search area in limited to y_value_start of 400 
 - Search area per window: Again, as was talked about in class there is no reason to look for "small cars" near us, this is why each window stops searching at the different y_value_stop.
@@ -152,7 +162,7 @@ As I talked before I tried different features configuration, different color map
 
 -	how the SVC model did: You can see here some false detections. In order to remove those detections we used the heatmap algorithm that was talked about in class. The heatmap threshold I used was 5 (heat_map_th, Line 668)
 -	Heatmap per image after thresholding that help us remove false detections.
--	Final estimation per image. We can see better performance than what only the SVC has done 
+-	Final estimation per image. This estimation was done using the `label()` function that was shown in class. We can see better performance than what only the SVC has done, and that almost all the false detections are gone. 
  
 
 ![alt text][image9]
@@ -168,17 +178,17 @@ As I talked before I tried different features configuration, different color map
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
 Here's a [link to my video result](https://github.com/shayko18/CarND-Vehicle-Detection/blob/master/project_video_with_cars.mp4)
 
-I aslo added the lane lines from the last project.
+I aslo added the **lane lines** from the last project.
 
 ####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
 The pipeline for each frame is in the function process_image(...) (Lines 653-776). The stages in the pipeline:
 
-- Each frame is passed in the SVC using the function search_windows(...) (Lines 735-740). and we get all the detected windows on this frame.
-- We try to filter out false detection on this frame using the heatmap on it, using a configurable threshold (I set it to 5) (Lines 743-747)
-- We want also to filter the results over time (frames), so we save the last `n_frames_history` frames heatmap (set it to 15) (Lines 749-751)
+- Each frame is passed in the SVC using the function search_windows(...) (Lines 735-740). The output gives us all the "hot" windows on this frame.
+- I try to filter out false detections on this frame using the heatmap only on this frame and by using a configurable threshold (I set it to 5) (Lines 743-747)
+- I want also to filter the results over time (frames), so we save the last `n_frames_history` frames heatmap (set it to 15) (Lines 749-751)
 - To get the estimation on the current frame we create a heatmap_over_time using all the last heatmaps we saved. (Lines 752)
-- I than threshold this new map using a new threshold which is the single frame threshold times the number of history heatmaps (Lines 753-754)- 
+- I than threshold this new map using a new threshold which is the single frame threshold (5) times the number of history heatmaps (15) (Lines 753-754)
 - I then used `scipy.ndimage.measurements.label()` to identify individual blobs in this heatmap_over_time and we assume each blob corresponded to a vehicle. (Lines 756)
 - I constructed bounding boxes to cover the area of each blob detected (Lines 757)
   
@@ -202,9 +212,9 @@ Here's an example result showing the heatmap from a series of frames of video (f
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
 
-- One issue is that are a lot of parameters to configurated. I think that in a different video the configuration I selected (which can take some time to optimize) would not work as good as in this video. 
--	There is a question of performance vs computation power. We didn’t payed much emphasis on the computation power in this project. There are a few ways we could improve this – for example not to search every frame entire area but to look only on the hot areas we have so far and only once every few frame to search the entire area.
--	There is also a trade of on the filter BW we used on the frames. long history we remove false detections but could be less accurate in the car position and it will take it more time to mark a new car
+- One issue is that there are a lot of parameters to configurated. I think that in a different video the configuration I selected (which can take some time to optimize) would not work as good as it worked on this video. 
+-	There is a question of performance vs computation power. We didn’t payed much emphasis on the computation power in this project. There are a few ways we could improve this – for example not to search every frame entire area but to look only on the hot areas we have so far and only once every few frame to search the entire area. Other ways to improve the HOG comutation were shown in class.
+-	There is also a trade of on the filter BW we used on the frames. long history we remove false detections but could be less accurate in the car position and it will take it more time to mark a new car.
 -	I added also the lane line estimation from the previous project.
  
 
