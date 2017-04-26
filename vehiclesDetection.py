@@ -561,16 +561,16 @@ if (load_svc==False):
 
 		
 	X = np.vstack((car_features, notcar_features)).astype(np.float64)                        	
-	X_scaler = StandardScaler().fit(X) # Fit a per-column scaler	
-	scaled_X = X_scaler.transform(X) # Apply the scaler to X
-
-	# Define the labels vector
-	y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
-	# Split up data into randomized training and test sets
-	rand_state = np.random.randint(0, 100)
-	X_train, X_test, y_train, y_test = train_test_split(scaled_X, y, test_size=0.2, random_state=rand_state)
+	y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features)))) # Define the labels vector
 	
-	print('Vehicles images length = {}'.format(len(imgs_cars)))
+	# Split up data into randomized training and test sets. Scaling is done only on the training set
+	rand_state = np.random.randint(0, 100)
+	X_train_unscale, X_test_unscale, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=rand_state)
+	X_scaler = StandardScaler().fit(X_train_unscale) # Fit a per-column scaler	
+	X_train = X_scaler.transform(X_train_unscale) # Apply the scaler to X train
+	X_test = X_scaler.transform(X_test_unscale) # Apply the scaler to X test
+	
+	print('Vehicles images length = {}'.format(len(imgs_cars))) 
 	print('Non-Vehicles images length = {}'.format(len(imgs_non_cars)))
 	print('Train data length = {}'.format(len(X_train)))
 	print('Test data length = {}'.format(len(X_test)))

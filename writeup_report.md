@@ -73,10 +73,19 @@ In lines 541-565 we extracted the features from the given images of the `vehicle
  
 ![alt text][image1]
 
-Next for each image we extracted the features we want. I used the spatial features, the histogram features and the most important is the HOG features. The function that was used for it was extract_features(...) (Line 95-166). This function was talked about in class. To get the HOG features it calls get_hog_features(...) (Line 39-64) which will simply call the hog function. Later we will show the number of features of each kind.
+Next for each image we extracted the features we want. I used the spatial features, the histogram features and the most important is the HOG features. The function that was used for it was extract_features(...) (Line 95-166). This function was talked about in class. 
+To get the:
 
+- HOG features: it calls get_hog_features(...) (Line 39-64) which will simply call the hog function. The HOG I used worked only on one channle - the Y channel from the color scale of `YCrCb`.
+- Spatial features: it calls bin_spatial(...) (Line 67-76) which simply rescale the image to a new size (16x16, in my case)
+- Histogram features: it calls color_hist(...) (Lines 79-92) which simply concatenate histograms on the three channel. We used 16 bins for each channel (the color scale was `YCrCb`).
 
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like. I also tested some configurations with the SVC to see what are the result I get. When I added also the spatial features and the histogram features the SVC estimator improved from about 95% to 98%. Of course it will require more computation but I decided to stay with it for now.
+Later we will show the number of features of each kind.
+
+**Normalizing**:
+After we have all the features we normalize them using `sklearn.preprocessing.StandardScaler()` (Lines 569-571) as was talked about in class. I think that the code that was taken from the class lesson is wrong. In my opinion the StandardScaler() should only work on the **trining set** (and not on all the set like it was in class), beacuse this will contaminate the test error estimation. Like we will do later in the project - a new input will use the "scalar" we found when we trained the SVC, it will not influence the "scalar". This is the same as calculation the SVC model - the SVC is only trained on the "training set", we don't look on the test set.
+
+I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like. I also tested some configurations with the SVC to see what are the result I get. When I added also the spatial features and the histogram features the SVC estimator improved from about ~95% to ~97.5%. Of course it will require more computation but I decided to stay with it for now.
 
 Here is an example using the `YCrCb` color space and HOG parameters fron the Y-channel of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`. 
 
@@ -91,7 +100,7 @@ The first three examples are for car images and the last three are for non car i
 
 ####2. Explain how you settled on your final choice of HOG parameters.
 
-I tried various combinations of parameters and I checked the performance I get from the SVC estimator. Of course, there is some tradeoff with the number of features, but the values we set seems reasonable and gave good performance: error rate of about 2%
+I tried various combinations of parameters and I checked the performance I get from the SVC estimator. Of course, there is some tradeoff with the number of features, but the values we set seems reasonable and gave good performance: error rate of about 2.5%
 It also seemed a good idea to use the Y channel (gray scale) to get the HOG features, and that is what I did.
 Those are the final parameters I used (including the other features) (Lines 528-539):
 
@@ -124,15 +133,15 @@ We read all the images that are given to us of cars and non-cars. We can see tha
 
 After extracting and scaling all the features we have we took few steps to train the SVC model:
 
-- shuffle all the data we have (Line 570-571)
-- split the data to training set (80%) and test set (20%) (Lines 571)
+- shuffle all the data we have with a random seed (Line 567-568)
+- split the data to training set (80%) and test set (20%) (Lines 568)
 	- Train data length = 14208
 	- Test data length = 3552
 
 - fit a linear SVC model (Lines 581-585)
 - test the SVC model (Line 586)
 	7.63 Seconds to train SVC...
-	- Test Accuracy of SVC =  0.9809
+	- Test Accuracy of SVC =  0.9758
 
 
 ###Sliding Window Search
@@ -216,5 +225,6 @@ Here's an example result showing the heatmap from a series of frames of video (f
 -	There is a question of performance vs computation power. We didn’t payed much emphasis on the computation power in this project. There are a few ways we could improve this – for example not to search every frame entire area but to look only on the hot areas we have so far and only once every few frame to search the entire area. Other ways to improve the HOG comutation were shown in class.
 -	There is also a trade of on the filter BW we used on the frames. long history we remove false detections but could be less accurate in the car position and it will take it more time to mark a new car.
 -	I added also the lane line estimation from the previous project.
+-	As I talked about before, I fix the normalization (from what was shown in class) so the "scalar" is calculated only on the training set and not on all the set (including the test set).
  
 
